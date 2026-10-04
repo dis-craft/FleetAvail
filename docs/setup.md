@@ -52,7 +52,14 @@ Fleet: verify 12 aircraft, readiness, current availability, projected availabili
 
 What-if: select an aircraft, set degradation to 20%, click Simulate. Health/RUL and projected fleet availability should decrease.
 
-Maintenance: select an aircraft and click Recommend. The response returns the priority component, action, RUL, risk, spare and reason codes.
+Maintenance: select an aircraft and click Recommend. The response returns the priority component, action, schedule day, RUL, risk, spare and reason codes.
+
+Decision APIs:
+- GET /api/fleet/availability — current and projected fleet readiness
+- GET /api/fleet/aircraft/AF-001/twin — persisted digital-twin state
+- POST /api/maintenance/plan — 7-day constrained maintenance plan
+- POST /api/spares/allocate — constrained spare allocation
+- POST /api/fleet/availability — projected readiness using the decision plan
 
 Live telemetry: the dashboard connects to /ws/telemetry and updates approximately once per second.
 
@@ -74,7 +81,8 @@ If backend imports fail, run Uvicorn from the repository root.
 If port 8000 is busy:
 python -m uvicorn backend.app.main:app --reload --port 8010
 
-The first scaffold intentionally does not require PyTorch. Add it when implementing the temporal RUL provider.
+The decision-layer features added in October 2026 do not require TensorFlow or PyTorch. LSTM/TCN training remains a separate optional environment step.
+The digital twin uses a local JSON persistence file by default so the prototype remains runnable without PostgreSQL/Redis. The store API is intentionally replaceable by those services later.
 
 ## Data boundary
 Put downloaded C-MAPSS files under data/raw/. Do not commit proprietary or sensitive aircraft data.
