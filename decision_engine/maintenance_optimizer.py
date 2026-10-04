@@ -41,7 +41,7 @@ def maintenance_score(
     urgency = 1.0 / (1.0 + max(0.0, float(rul_cycles)))
     mission = max(0.1, min(2.0, float(mission_priority)))
     spare_bonus = 0.10 if spare_available else -0.05
-    return round(0.65 * risk + 8.0 * urgency + 0.30 * (2.0 - mission) + spare_bonus, 4)
+    return round(0.65 * risk + 8.0 * urgency + 0.30 * mission + spare_bonus, 4)
 
 
 def build_maintenance_plan(
