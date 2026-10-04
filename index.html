@@ -447,6 +447,10 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
         <tr><td>Feature #11 Fleet availability</td><td><code>daea40f96e5ec0631fc35cf2f33a43568ea5a99</code></td><td><code>decision_engine/fleet_availability.py</code></td></tr>
         <tr><td>Decision API integration</td><td><code>b48cc693e404279e49605bd25023b441dbcf198c</code> + <code>fef63491cda562d1faa3e1bab77233841696c9cf</code></td><td><code>backend/app/main.py</code>, <code>backend/app/services/core.py</code></td></tr>
         <tr><td>Decision-layer tests</td><td><code>a33828c0c7d8362347ae3483b31fb3f9cedfc749</code> + <code>04e10cdc6ce28bfde9231b01bac8c62b9ac2d002</code></td><td><code>tests/test_decision_layers.py</code>, <code>tests/test_api_decision_layers.py</code></td></tr>
+        <tr><td>Maintenance/twin hardening</td><td><code>5dc3e8620ff9a46b889320f8c6f52c122a0dc908</code> + <code>00407f062eca680f7f97ef0a9e286b2399bae2db</code> + <code>393390012926d39564e02ead114e982a913e4285</code></td><td>Maintenance capacity, twin cycle handling and mission-priority scoring</td></tr>
+        <tr><td>Maintenance lifecycle API</td><td><code>08197679accf36a7976562d8b5d01ddd99061105</code> + <code>ef758bd57bcb7a99a5be673275c83929a350e03c</code></td><td><code>/api/fleet/aircraft/{id}/maintenance</code> + regression test</td></tr>
+        <tr><td>Fleet planning capacity propagation</td><td><code>e6494270e5cea40bffd36db93a3a2d24369716f0</code> + <code>a53c688f2bebe7cc2738157e1ed64b8a7b6d37e5</code></td><td>Daily maintenance capacity now reaches fleet projection</td></tr>
+        <tr><td>API test isolation</td><td><code>e4189f27477582d096855843977eeee229c5bfd6</code></td><td>Tests use a temporary digital-twin store per run</td></tr>
       </tbody>
     </table>
     <p class="small">The commits above record the staged implementation through Features #5 and #8–11. The remaining major integration gap is Stage 7: trained ML providers are not yet the runtime source for FastAPI predictions.</p>
