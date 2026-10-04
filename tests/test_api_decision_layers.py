@@ -58,3 +58,21 @@ def test_prediction_updates_digital_twin():
     twin = client.get("/api/fleet/aircraft/AF-003/twin").json()
     assert twin["components"]["ENGINE"]["last_update_cycle"] == 42
     assert twin["events"][-1]["event_type"] == "PREDICTION_UPDATE"
+
+
+def test_maintenance_execution_updates_twin():
+    response = client.post(
+        "/api/fleet/aircraft/AF-004/maintenance",
+        json={
+            "component": "ENGINE",
+            "action": "REPLACE_COMPONENT",
+            "cycle": 50,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["component_state"]["lifecycle_status"] == "IN_SERVICE"
+
+    twin = client.get("/api/fleet/aircraft/AF-004/twin").json()
+    assert twin["events"][-1]["event_type"] == "MAINTENANCE"
+    assert twin["events"][-1]["payload"]["action"] == "REPLACE_COMPONENT"
