@@ -24,7 +24,7 @@ class MaintenancePlanItem:
     component: str
     action: str
     priority_score: float
-    scheduled_day: int
+    scheduled_day: int | None
     duration_hours: float
     spare_part_id: str
     reason_codes: tuple[str, ...]
@@ -76,7 +76,7 @@ def build_maintenance_plan(
         urgent = candidate.failure_probability >= 0.85 or candidate.rul_cycles <= 20
         preferred = candidate.failure_probability >= 0.60 or candidate.rul_cycles <= 45
         max_day = min(1 if urgent else 3 if preferred else horizon_days, horizon_days) - 1
-        chosen_day = horizon_days - 1
+        chosen_day = None
 
         for day in range(max_day + 1):
             if daily_load[day] + candidate.maintenance_duration_hours <= max_maintenance_hours_per_day:
@@ -86,17 +86,26 @@ def build_maintenance_plan(
         if candidate.spare_available <= 0:
             action = "ORDER_SPARE_AND_HOLD"
             reasons = ("SPARE_SHORTAGE", "FLEET_IMPACT", "RISK_OR_URGENCY")
+            chosen_day = None
         elif urgent:
-            action = "GROUND_AND_MAINTAIN"
-            reasons = ("CRITICAL_RISK", "LOW_RUL", "FLEET_IMPACT")
+            if chosen_day is None:
+                action = "DEFER_CAPACITY"
+                reasons = ("CRITICAL_RISK", "LOW_RUL", "MAINTENANCE_CAPACITY")
+            else:
+                action = "GROUND_AND_MAINTAIN"
+                reasons = ("CRITICAL_RISK", "LOW_RUL", "FLEET_IMPACT")
         elif preferred:
-            action = "SCHEDULE_MAINTENANCE"
-            reasons = ("ELEVATED_RISK", "RUL_URGENCY")
+            if chosen_day is None:
+                action = "DEFER_CAPACITY"
+                reasons = ("ELEVATED_RISK", "RUL_URGENCY", "MAINTENANCE_CAPACITY")
+            else:
+                action = "SCHEDULE_MAINTENANCE"
+                reasons = ("ELEVATED_RISK", "RUL_URGENCY")
         else:
             action = "MONITOR"
             reasons = ("NO_IMMEDIATE_TRIGGER",)
 
-        if action in {"GROUND_AND_MAINTAIN", "SCHEDULE_MAINTENANCE"}:
+        if chosen_day is not None and action in {"GROUND_AND_MAINTAIN", "SCHEDULE_MAINTENANCE"}:
             daily_load[chosen_day] += candidate.maintenance_duration_hours
         plan.append(
             MaintenancePlanItem(
