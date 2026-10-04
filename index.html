@@ -342,7 +342,7 @@ models/cmapss/fd001_rul.json</pre>
     <pre>http://127.0.0.1:8000/
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/health</pre>
-    <p>The current dashboard remains heuristic/synthetic; training the C-MAPSS model alone does not automatically replace the API provider yet.</p>
+    <p>The dashboard now consumes the unified runtime; trained artifacts are used when available, with cold-start and synthetic fallback for local demos.</p>
 
     <h3>F. Run the repository tests</h3>
     <pre>pytest -q</pre>
@@ -386,7 +386,7 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
         <tr><td>Isolation Forest</td><td>Unsupervised anomaly score.</td><td class="status done">Implemented as Feature #4.</td></tr>
         <tr><td>Formal HealthState fusion</td><td>NORMAL/WATCH/DEGRADED/CRITICAL operational state.</td><td class="status done">Implemented as Feature #5.</td></tr>
         <tr><td>LSTM/TCN RUL</td><td>Temporal RUL models and comparison against the baseline.</td><td class="status done">Implemented as Feature #6; training remains local.</td></tr>
-        <tr><td>Real-time ML API integration</td><td>FastAPI receives sequence data and runs actual trained providers.</td><td>Next major integration stage.</td></tr>
+        <tr><td>Real-time ML API integration</td><td>Unified runtime feeds FastAPI and WebSocket telemetry with trained branches when artifacts are available.</td><td class="status done">Integrated.</td></tr>
         <tr><td>Digital twin persistence</td><td>Aircraft/component lifecycle history and maintenance events.</td><td class="status done">Implemented as Feature #8 using local atomic JSON.</td></tr>
         <tr><td>Maintenance optimization</td><td>Constraint-aware maintenance scheduling.</td><td class="status done">Implemented as Feature #9.</td></tr>
         <tr><td>Spare allocation</td><td>Fleet-wide allocation of limited compatible parts.</td><td class="status done">Implemented as Feature #10.</td></tr>
@@ -405,7 +405,7 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
 4. Isolation Forest anomaly model                ✅
 5. Health Fusion formalization                   ✅
 6. LSTM/TCN comparison                           ✅
-7. Real-time ML provider integration             → NEXT
+7. Real-time ML provider integration             ✅
 8. Digital Twin persistence                      ✅
 9. Maintenance optimizer                         ✅
 10. Spare allocation                             ✅
