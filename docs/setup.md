@@ -8,7 +8,7 @@
 Node.js is not required for the current first-pass dashboard because it is served directly by FastAPI.
 
 ## 1. Clone
-git clone https://github.com/Adi-Deshmukh/FleetAvail.git
+git clone https://github.com/dis-craft/FleetAvail.git
 cd FleetAvail
 
 ## 2. Create environment
