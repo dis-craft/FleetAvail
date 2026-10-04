@@ -140,16 +140,7 @@ class FleetService:
             self.fused(a, "ENGINE")["health_level"] == "CRITICAL"
             for a in self.aircraft.values()
         )
-        availability = calculate_fleet_availability(
-            [
-                AircraftAvailabilityInput(
-                    aircraft_id=a.id,
-                    current_status=a.status,
-                    critical=self.fused(a, "ENGINE")["health_level"] == "CRITICAL",
-                )
-                for a in self.aircraft.values()
-            ]
-        )
+        availability = self.fleet_availability()
         return {
             "total_aircraft": total,
             "ready": ready,
@@ -200,7 +191,10 @@ class FleetService:
             x["rul"] = max(3.0, x["rul"] * (0.96 if penalty else 1.005))
 
         prediction = self.fused(aircraft, component)
-        cycle = int(telemetry.get("cycle", 1)) if telemetry else 1
+        existing_twin = self.twin_store.get_or_create(aircraft_id)
+        existing_component = existing_twin.components.get(component)
+        default_cycle = (existing_component.last_update_cycle + 1) if existing_component else 1
+        cycle = int(telemetry.get("cycle", default_cycle)) if telemetry else default_cycle
         self._sync_twin(aircraft_id, component, prediction, cycle)
         return prediction
 
@@ -290,8 +284,17 @@ class FleetService:
             "reason_codes": chosen["reason_codes"],
         }
 
-    def allocate_spares_for_plan(self, mission_priority: float = 1.0):
-        plan = self.maintenance_plan(mission_priority=mission_priority)
+    def allocate_spares_for_plan(
+        self,
+        mission_priority: float = 1.0,
+        horizon_days: int = 7,
+        max_daily_hours: float = 24.0,
+    ):
+        plan = self.maintenance_plan(
+            mission_priority=mission_priority,
+            horizon_days=horizon_days,
+            max_daily_hours=max_daily_hours,
+        )
         inventory = {item["part_id"]: item["quantity"] for item in self.spares_data}
         requests = []
         for item in plan["items"]:
@@ -347,7 +350,11 @@ class FleetService:
             mission_priority=mission_priority,
             horizon_days=horizon_days,
         )
-        allocation = self.allocate_spares_for_plan(mission_priority)
+        allocation = self.allocate_spares_for_plan(
+            mission_priority=mission_priority,
+            horizon_days=horizon_days,
+            max_daily_hours=24.0,
+        )
         allocated_keys = {
             (item["aircraft_id"], item["component"])
             for item in allocation["allocations"]
@@ -385,6 +392,28 @@ class FleetService:
         result["maintenance_plan_items"] = len(plan["items"])
         result["spare_unmet_requests"] = allocation["inventory"]["total_unmet"]
         return result
+
+    def record_maintenance(self, aircraft_id, component, action, cycle):
+        self.aircraft[aircraft_id].status = "READY"
+        state = self.twin_store.record_maintenance(
+            aircraft_id,
+            component,
+            action=action,
+            cycle=cycle,
+        )
+        return {
+            "aircraft_id": aircraft_id,
+            "component": component,
+            "action": action,
+            "cycle": cycle,
+            "component_state": {
+                "health": state.health,
+                "rul_cycles": state.rul_cycles,
+                "failure_probability": state.failure_probability,
+                "anomaly_score": state.anomaly_score,
+                "lifecycle_status": state.lifecycle_status,
+            },
+        }
 
     def twin_snapshot(self, aircraft_id):
         return self.twin_store.snapshot(aircraft_id)
