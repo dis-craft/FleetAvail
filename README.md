@@ -15,6 +15,11 @@ FleetAvail is an integration prototype for aircraft health monitoring, predictiv
 - FastAPI REST API
 - Runnable command dashboard
 - Pytest coverage
+- Formal health-state fusion
+- Persistent digital-twin lifecycle state
+- Constraint-aware maintenance planning
+- Inventory-constrained spare allocation
+- Current/projected fleet availability planning
 
 The current inference provider is intentionally synthetic/heuristic so the repository runs without proprietary aircraft data or downloaded model weights. It leaves a clean replacement point for C-MAPSS-trained XGBoost/LSTM/TCN models.
 
@@ -52,14 +57,19 @@ POST /api/maintenance/recommend
 GET /api/spares
 WS /ws/telemetry
 
+## Current decision layer
+1. Health Fusion converts health, RUL, failure risk, anomaly, confidence and data quality into NORMAL/WATCH/DEGRADED/CRITICAL.
+2. Digital Twin persists aircraft/component state and lifecycle events locally in atomic JSON.
+3. Maintenance planning schedules risk-driven work within daily maintenance-hour capacity.
+4. Spare allocation respects compatible inventory and reports unmet requests.
+5. Fleet availability projects readiness after feasible maintenance and spare decisions.
+
 ## Next layer
-1. Replace the heuristic provider with leakage-aware C-MAPSS training.
-2. Add a temporal RUL model and failure classifier behind the same API contract.
-3. Add maintenance-history and component-lifecycle schemas.
-4. Add PostgreSQL/Redis persistence.
+1. Wire the trained ML branches into real-time inference.
+2. Add PostgreSQL/Redis persistence behind the existing digital-twin store interface.
+3. Add formal OR-Tools optimisation after the deterministic decision baseline is validated.
+4. Add uncertainty calibration, SHAP explanations and drift/OOD monitoring.
 5. Add React/Next.js + Three.js digital-twin UI.
-6. Add uncertainty calibration, SHAP explanations and drift/OOD monitoring.
-7. Add OR-Tools maintenance/spares optimisation.
 
 ## Limitation
 This is a software prototype, not a certified aviation or defence system. Demo telemetry is synthetic and must not be interpreted as real Indian military aircraft data.
