@@ -138,6 +138,7 @@ def projected_availability(x: PlanningOptions):
     return service.fleet_availability(
         mission_priority=x.mission_priority,
         horizon_days=x.horizon_days,
+        max_daily_hours=x.max_daily_hours,
     )
 
 
