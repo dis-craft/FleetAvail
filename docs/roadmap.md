@@ -11,7 +11,7 @@ while the existing synthetic dashboard remains runnable during the transition to
 | 4 | Isolation Forest | ✅ Normal-reference anomaly detector with calibrated threshold and persistence |
 | 5 | Health Fusion | ✅ Typed NORMAL/WATCH/DEGRADED/CRITICAL state with reason codes |
 | 6 | LSTM/TCN RUL | ✅ LSTM and causal dilated TCN training/inference branch; offline comparison only |
-| 7 | Real-time ML inference | ⏳ Wire trained XGBoost/RUL/anomaly providers into telemetry and FastAPI |
+| 7 | Real-time ML inference | ✅ Unified 30-cycle runtime, model loading, cold-start fallback, FastAPI and WebSocket integration |
 | 8 | Digital Twin persistence | ✅ Persistent aircraft/component lifecycle state and event history using atomic local JSON; backend-neutral store API |
 | 9 | Maintenance optimizer | ✅ Constraint-aware 7-day scheduling with risk/RUL/mission priority, duration and spare constraints |
 | 10 | Spare allocation | ✅ Priority-aware allocation that never exceeds compatible inventory and reports unmet demand |
@@ -35,8 +35,7 @@ Telemetry + maintenance history
 ## Important implementation boundary
 
 The repository now contains the decision layers requested in stages 5 and 8–11.
-The FastAPI service still uses the deterministic synthetic fleet state for the demo; stage 7
-is where trained model artifacts become the runtime inference source.
+The FastAPI service now uses the unified runtime for ENGINE inference when trained artifacts are available, with cold-start and synthetic fallback keeping the demo runnable.
 
 ## Feature 5 — Health Fusion verification
 
@@ -113,5 +112,4 @@ not part of the base requirements file.
 
 ## Next implementation target
 
-Stage 7: real-time ML inference. That is where the sequence buffer, trained XGBoost, trained RUL model,
-and Isolation Forest become one runtime inference pipeline and feed the formal Health Fusion layer.
+Stage 12: MLOps and explainability, including model versioning, drift monitoring, uncertainty, SHAP explanations and recommendation audit trails.
