@@ -96,7 +96,8 @@ def build_maintenance_plan(
             action = "MONITOR"
             reasons = ("NO_IMMEDIATE_TRIGGER",)
 
-        daily_load[chosen_day] += candidate.maintenance_duration_hours
+        if action in {"GROUND_AND_MAINTAIN", "SCHEDULE_MAINTENANCE"}:
+            daily_load[chosen_day] += candidate.maintenance_duration_hours
         plan.append(
             MaintenancePlanItem(
                 aircraft_id=candidate.aircraft_id,
