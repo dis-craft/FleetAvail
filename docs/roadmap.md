@@ -1,72 +1,117 @@
 # FleetAvail implementation roadmap
 
-This roadmap follows the project completion chain in order. Each stage is
-kept independently deployable so the existing synthetic dashboard remains
-usable while trained ML branches are added.
+This roadmap follows the completion chain in order. Each layer is independently testable,
+while the existing synthetic dashboard remains runnable during the transition to trained ML.
 
-| Stage | Feature | What it does | Implementation |
-|---|---|---|---|
-| 1 | C-MAPSS baseline/provider | Turns a 30-cycle telemetry window into an RUL estimate | Keep the existing leakage-aware pipeline and expose the trained artifact through a provider boundary |
-| 2 | Telemetry sequence buffer | Maintains bounded per-aircraft/component history | **Implemented:** `ml/sequence_buffer.py` stores the latest 30 valid samples per aircraft/component, enforces cycle ordering, and exposes chronological NumPy windows. |
-| 3 | XGBoost failure model | Predicts near-term failure risk | **Implemented:** `ml/cmapss/failure_risk.py` defines the RUL-horizon label, engine-aware splits, XGBoost classifier, held-out sigmoid calibration, metrics, persistence and inference; `scripts/train_failure.py` and `scripts/predict_failure.py` provide reproducible commands. |
-| 4 | Isolation Forest | Detects abnormal operating behavior without complete anomaly labels | **Implemented:** `ml/cmapss/anomaly.py` trains on a normal-operation reference population, calibrates a threshold from normal scores, persists metadata, and remains independent of FastAPI/API integration. |
-| 5 | Health Fusion | Converts RUL, risk, anomaly, confidence and data quality into an operational state | Implement a typed HealthState and explicit NORMAL/WATCH/DEGRADED/CRITICAL rules |
-| 6 | LSTM/TCN RUL | Learns ordered degradation instead of summary-only windows | **Implemented:** LSTM + causal dilated TCN sequence models share the existing 30-cycle C-MAPSS preprocessing, use engine-level train/validation separation, persist scalers, and report MAE/RMSE/score against the HistGradientBoosting baseline. Models remain offline and are not wired to FastAPI. |
-| 7 | Real-time ML inference | Runs all trained branches on incoming telemetry | Wire providers into FastAPI with cold-start fallback and model metadata |
-| 8 | Digital twin persistence | Stores component state and maintenance lifecycle | PostgreSQL/Redis-backed aircraft, component, inspection, replacement and degradation state |
-| 9 | Maintenance optimizer | Selects maintenance timing/actions under constraints | Start with weighted priority; move to formal OR-Tools optimization |
-| 10 | Spare allocation | Allocates constrained compatible inventory across aircraft | Optimize aircraft priority, delay safety and fleet impact |
-| 11 | Fleet availability | Quantifies readiness before/after decisions | Model operational/maintenance/spare-blocked states and projected availability |
-| 12 | MLOps/explainability | Makes model behavior auditable | Versioning, drift, uncertainty, SHAP, prediction monitoring and recommendation audit trail |
-| 13 | Final frontend | Presents the complete decision system | Replace the static dashboard with React/Next.js + Three.js twin, fleet ranking, explanations, spares and what-if controls |
+| Stage | Feature | Current implementation |
+|---|---|---|
+| 1 | C-MAPSS baseline/provider | ✅ Leakage-aware preprocessing, 30-cycle windows, baseline RUL model and provider boundary |
+| 2 | Telemetry sequence buffer | ✅ Bounded per-aircraft/component 30-cycle history with ordering validation |
+| 3 | XGBoost failure model | ✅ Near-term failure risk with engine-aware splitting and probability calibration |
+| 4 | Isolation Forest | ✅ Normal-reference anomaly detector with calibrated threshold and persistence |
+| 5 | Health Fusion | ✅ Typed NORMAL/WATCH/DEGRADED/CRITICAL state with reason codes |
+| 6 | LSTM/TCN RUL | ✅ LSTM and causal dilated TCN training/inference branch; offline comparison only |
+| 7 | Real-time ML inference | ⏳ Wire trained XGBoost/RUL/anomaly providers into telemetry and FastAPI |
+| 8 | Digital Twin persistence | ✅ Persistent aircraft/component lifecycle state and event history using atomic local JSON; backend-neutral store API |
+| 9 | Maintenance optimizer | ✅ Constraint-aware 7-day scheduling with risk/RUL/mission priority, duration and spare constraints |
+| 10 | Spare allocation | ✅ Priority-aware allocation that never exceeds compatible inventory and reports unmet demand |
+| 11 | Fleet availability | ✅ Current/projected readiness calculation using maintenance schedules and spare feasibility |
+| 12 | MLOps/explainability | ⏳ Versioning, drift, uncertainty, SHAP, prediction monitoring and audit trail |
+| 13 | Final frontend | ⏳ React/Next.js + Three.js operational dashboard |
 
-## Current baseline
+## Current architecture
 
-The repository already contains the C-MAPSS FD001–FD004 loading, leakage-aware
-preprocessing, temporal features, 30-cycle sequences and a
-HistGradientBoosting RUL baseline. The multi-model architecture is the target,
-not a claim that XGBoost/LSTM/TCN/Isolation Forest are already trained.
+Telemetry + maintenance history
+→ validation / data quality
+→ leakage-aware preprocessing
+→ XGBoost failure risk + LSTM/TCN RUL + Isolation Forest anomaly
+→ Health Fusion
+→ Digital Twin
+→ Maintenance Optimizer
+→ Spare Allocation
+→ Fleet Availability
+→ API / dashboard
 
-## Immediate implementation order
+## Important implementation boundary
 
-1. Keep the current C-MAPSS pipeline reproducible. ✅
-2. Add the provider boundary and sequence-aware API contract. ✅
-3. Add the 30-cycle telemetry sequence buffer. ✅
-4. Add XGBoost failure-risk branch. ✅
-5. Add Isolation Forest as an independent branch. ✅
-6. Fuse the model outputs.
-7. Compare LSTM/TCN with the baseline before replacing the RUL branch.
-8. Persist the twin and then optimize maintenance/spares at fleet level.
-9. Upgrade the UI once the backend outputs are stable.
+The repository now contains the decision layers requested in stages 5 and 8–11.
+The FastAPI service still uses the deterministic synthetic fleet state for the demo; stage 7
+is where trained model artifacts become the runtime inference source.
 
+## Feature 5 — Health Fusion verification
 
-## Feature 2 verification
+Run:
+pytest -q tests/test_health_fusion.py
 
-Run the focused buffer tests:
+The tests cover the four operational states, reason codes, legacy compatibility, and invalid inputs.
 
-```powershell
-pytest -q tests/test_sequence_buffer.py
-```
+## Feature 8 — Digital Twin verification
 
-This verifies the fixed-size rolling window, aircraft/component isolation, chronological feature ordering, duplicate/out-of-order rejection, finite numeric inputs, and incomplete-window behavior.
+The store persists component predictions, lifecycle status, maintenance events and the latest bounded
+event history. It defaults to data/digital_twin_state.json.
 
+Run:
+pytest -q tests/test_decision_layers.py -k digital_twin
 
-## Feature 3 verification
+The persistence file is local runtime state and is ignored by Git.
 
-XGBoost failure risk is implemented but is not yet connected to the FastAPI runtime. It is trained separately so model validation remains reproducible before API integration.
+## Feature 9 — Maintenance optimizer verification
 
-Install dependencies and run the focused tests:
+Run:
+pytest -q tests/test_decision_layers.py -k maintenance
 
-```powershell
-pytest -q tests/test_failure.py
-```
+The planner ranks candidates using failure risk, RUL urgency, mission priority and spare availability,
+then respects a daily maintenance-hour capacity.
 
-Train on FD001 after placing the NASA files under `data/raw/cmapss/FD001/`:
+API:
+curl.exe -X POST http://127.0.0.1:8000/api/maintenance/plan -H "Content-Type: application/json" -d "{\"mission_priority\":1,\"horizon_days\":7,\"max_daily_hours\":24}"
 
-```powershell
-python scripts/train_failure.py --subset FD001 --horizon 30
-python scripts/predict_failure.py --subset FD001
-```
+## Feature 10 — Spare allocation verification
 
-The training command writes `models/cmapss/fd001_failure.joblib` and `models/cmapss/fd001_failure.json`.
-\n\n## Feature 6 verification\n\nThe LSTM/TCN branch is intentionally separate from API integration. It reuses the existing C-MAPSS cleaning, constant-feature removal, temporal features, scaling and 30-cycle sequence contract.\n\nTrain both temporal models on FD001:\n\n```powershell\npython scripts/train_temporal_rul.py --subset FD001 --architecture both\n```\n\nThis writes model, metadata, scaler, and comparison artifacts under models/cmapss/. The comparison file includes the existing fd001_rul.json HistGradientBoosting metrics when that baseline metadata is present. Do not replace the baseline unless a temporal model improves the required metrics on the held-out C-MAPSS test set.\n\nRun focused tests:\n\n```powershell\npytest -q tests/test_temporal_rul.py\n```\n\nRun temporal inference after training:\n\n```powershell\npython scripts/predict_temporal_rul.py --subset FD001 --architecture lstm\npython scripts/predict_temporal_rul.py --subset FD001 --architecture tcn\n```\n
+Run:
+pytest -q tests/test_decision_layers.py -k spare
+
+The allocator uses only compatible stock and never allocates more than the available quantity.
+The response reports allocated and unmet demand.
+
+API:
+curl.exe -X POST http://127.0.0.1:8000/api/spares/allocate -H "Content-Type: application/json" -d "{\"mission_priority\":1,\"horizon_days\":7,\"max_daily_hours\":24}"
+
+## Feature 11 — Fleet availability verification
+
+Run:
+pytest -q tests/test_decision_layers.py -k fleet_availability
+
+The calculation reports current readiness, projected readiness, blocked aircraft and aircraft that
+can recover within the planning horizon when maintenance and compatible spares are available.
+
+API:
+curl.exe http://127.0.0.1:8000/api/fleet/availability
+
+or:
+curl.exe -X POST http://127.0.0.1:8000/api/fleet/availability -H "Content-Type: application/json" -d "{\"mission_priority\":1,\"horizon_days\":7,\"max_daily_hours\":24}"
+
+## Full verification
+
+From the repository root:
+pip install -r requirements.txt
+pytest -q tests/test_health_fusion.py
+pytest -q tests/test_decision_layers.py
+pytest -q tests/test_api_decision_layers.py
+pytest -q
+python -m uvicorn backend.app.main:app --reload --port 8000
+
+## C-MAPSS training remains separate
+
+The NASA dataset is not committed. Put these files under data/raw/cmapss/FD001/:
+train.txt
+test.txt
+RUL_test.txt
+
+LSTM/TCN additionally require TensorFlow in the local Python environment because TensorFlow is intentionally
+not part of the base requirements file.
+
+## Next implementation target
+
+Stage 7: real-time ML inference. That is where the sequence buffer, trained XGBoost, trained RUL model,
+and Isolation Forest become one runtime inference pipeline and feed the formal Health Fusion layer.
