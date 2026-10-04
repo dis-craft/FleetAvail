@@ -1,1 +1,158 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FleetAvail</title><style>body{margin:0;background:#07111f;color:#e8eef7;font:14px Arial}main{max-width:1200px;margin:auto;padding:24px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card{background:#0e1b2d;border:1px solid #20334a;border-radius:10px;padding:16px}.kpi{font-size:28px;font-weight:700;margin-top:8px}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:9px;border-bottom:1px solid #20334a;text-align:left}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}button{padding:8px 12px;background:#143253;color:white;border:1px solid #2a4d73;border-radius:6px}pre{white-space:pre-wrap}@media(max-width:800px){.grid,.row{grid-template-columns:1fr 1fr}}@media(max-width:550px){.grid,.row{grid-template-columns:1fr}}</style></head><body><main><h1>FleetAvail Command Center</h1><p>SIH26249 · Predictive Maintenance & Fleet Availability</p><div id="k" class="grid"></div><div class="row"><div class="card"><b>Fleet snapshot</b><table><tbody id="f"></tbody></table></div><div class="card"><b>Live telemetry</b><pre id="s">Connecting…</pre></div></div><div class="row"><div class="card"><b>What-if</b><p><select id="a"></select> <input id="d" type="number" value="20">% <button onclick="sim()">Simulate</button></p><pre id="w"></pre></div><div class="card"><b>Maintenance</b><p><select id="m"></select> <button onclick="rec()">Recommend</button></p><pre id="r"></pre></div></div></main><script>async function g(u){let r=await fetch(u);return r.json()}async function load(){let s=await g('/api/fleet/summary');k.innerHTML=[['Availability',s.current_availability_pct+'%'],['7-day',s.projected_7_day_availability_pct+'%'],['Ready',s.ready+'/'+s.total_aircraft],['Critical',s.critical_aircraft]].map(x=>'<div class="card"><small>'+x[0]+'</small><div class="kpi">'+x[1]+'</div></div>').join('');let fs=await g('/api/fleet/aircraft');table.innerHTML=fs.map(x=>'<tr><td>'+x.aircraft_id+'</td><td>'+x.status+'</td><td>'+x.engine.rul_cycles+'</td><td>'+x.engine.alert_level+'</td></tr>').join('');let o=fs.map(x=>'<option>'+x.aircraft_id+'</option>').join('');air.innerHTML=o;maint.innerHTML=o}async function sim(){let air=document.getElementById('a'),deg=document.getElementById('d'),out=document.getElementById('w');out.textContent=JSON.stringify(await fetch('/api/simulate/what-if',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aircraft_id:air.value,degradation_pct:+deg.value})}).then(x=>x.json()),null,2)}async function rec(){let maint=document.getElementById('m'),out=document.getElementById('r');out.textContent=JSON.stringify(await fetch('/api/maintenance/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aircraft_id:maint.value,mission_priority:1})}).then(x=>x.json()),null,2)}function ws(){let x=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws/telemetry');x.onmessage=e=>document.getElementById('s').textContent=e.data;x.onclose=()=>setTimeout(ws,1500)}load();ws();setInterval(load,5000)</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FleetAvail Command Center</title>
+<style>
+:root{font-family:Inter,Arial,sans-serif;color:#e8eef7;background:#07111f}
+*{box-sizing:border-box}body{margin:0}main{max-width:1400px;margin:auto;padding:24px}
+h1{margin:0 0 4px}.muted{color:#8fa3bb}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:20px 0}
+.card{background:#0e1b2d;border:1px solid #20334a;border-radius:10px;padding:16px}
+.kpi{font-size:27px;font-weight:700;margin-top:7px}.section{margin-top:14px}
+.row{display:grid;grid-template-columns:1.4fr .8fr;gap:12px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #20334a;text-align:left}
+button,select,input{background:#12243a;color:#e8eef7;border:1px solid #2a4d73;border-radius:6px;padding:8px}
+button{cursor:pointer}pre{white-space:pre-wrap;overflow:auto;max-height:300px}
+.badge{padding:3px 7px;border-radius:12px;font-size:12px}.normal{background:#17452d}.watch{background:#4b4314}.degraded{background:#59351a}.critical{background:#5a2026}
+.model{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #20334a}
+@media(max-width:950px){.grid,.row,.row3{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid,.row,.row3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>FleetAvail Command Center</h1>
+<div class="muted">SIH26249 · ML-driven aircraft health, predictive maintenance and fleet availability</div>
+
+<div id="kpis" class="grid"></div>
+
+<div class="row">
+<section class="card">
+<h3>Fleet health</h3>
+<table><thead><tr><th>Aircraft</th><th>Status</th><th>Health</th><th>RUL</th><th>Failure risk</th><th>Anomaly</th><th>State</th></tr></thead>
+<tbody id="fleet"></tbody></table>
+</section>
+<section class="card">
+<h3>Model pipeline</h3>
+<div id="models"></div>
+<p class="muted" id="mode"></p>
+</section>
+</div>
+
+<div class="row section">
+<section class="card">
+<h3>Selected aircraft</h3>
+<select id="aircraftSelect"></select>
+<pre id="detail">Select an aircraft.</pre>
+</section>
+<section class="card">
+<h3>Live telemetry</h3>
+<div class="muted">WebSocket → telemetry → 30-cycle buffer → models → health fusion</div>
+<pre id="stream">Connecting…</pre>
+</section>
+</div>
+
+<div class="row3 section">
+<section class="card">
+<h3>What-if</h3>
+<select id="whatAircraft"></select>
+<input id="degradation" type="number" value="20"> %
+<button onclick="simulate()">Simulate</button>
+<pre id="whatResult"></pre>
+</section>
+<section class="card">
+<h3>Maintenance</h3>
+<select id="maintAircraft"></select>
+<button onclick="recommend()">Recommend</button>
+<pre id="maintResult"></pre>
+</section>
+<section class="card">
+<h3>Spares</h3>
+<pre id="spares"></pre>
+</section>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id)
+const API_BASE=(window.FLEETAVAIL_API_BASE||'').replace(/\/$/,'')
+const api=url=>API_BASE+url
+async function get(url){
+  const r=await fetch(api(url))
+  if(!r.ok)throw new Error(await r.text())
+  return r.json()
+}
+function badge(state){return '<span class="badge '+state.toLowerCase()+'">'+state+'</span>'}
+function pct(v){return v==null?'—':(Number(v)*100).toFixed(1)+'%'}
+function renderKpis(s){
+  $('kpis').innerHTML=[
+    ['Availability',s.current_availability_pct+'%'],
+    ['7-day projection',s.projected_7_day_availability_pct+'%'],
+    ['Ready',s.ready+'/'+s.total_aircraft],
+    ['Degraded',s.degraded],
+    ['Critical',s.critical_aircraft]
+  ].map(x=>'<div class="card"><div class="muted">'+x[0]+'</div><div class="kpi">'+x[1]+'</div></div>').join('')
+}
+function fillSelect(id,rows){
+  const current=$(id).value
+  $(id).innerHTML=rows.map(x=>'<option value="'+x.aircraft_id+'">'+x.aircraft_id+'</option>').join('')
+  if(current && rows.some(x=>x.aircraft_id===current))$(id).value=current
+}
+async function loadFleet(){
+  const [summary,rows,models,spares]=await Promise.all([
+    get('/api/fleet/summary'),get('/api/fleet/aircraft'),get('/api/models'),get('/api/spares')
+  ])
+  renderKpis(summary)
+  $('fleet').innerHTML=rows.map(x=>{
+    const p=x.engine
+    return '<tr><td>'+x.aircraft_id+'</td><td>'+x.status+'</td><td>'+p.health_score+'</td><td>'+p.rul_cycles+'</td><td>'+pct(p.failure_probability)+'</td><td>'+pct(p.anomaly_score)+'</td><td>'+badge(p.operational_state)+'</td></tr>'
+  }).join('')
+  fillSelect('aircraftSelect',rows);fillSelect('whatAircraft',rows);fillSelect('maintAircraft',rows)
+  $('models').innerHTML=Object.entries(models.branches||{}).map(([k,v])=>'<div class="model"><span>'+k.toUpperCase()+'</span><b>'+v.model+'</b></div>').join('')||'<div>No trained artifacts loaded</div>'
+  $('mode').textContent='Runtime mode: '+models.mode
+  $('spares').textContent=JSON.stringify(spares,null,2)
+  await loadDetail()
+}
+async function loadDetail(){
+  const id=$('aircraftSelect').value
+  if(!id)return
+  $('detail').textContent=JSON.stringify(await get('/api/fleet/aircraft/'+id),null,2)
+}
+async function post(url,payload){
+  const r=await fetch(api(url),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  if(!r.ok)throw new Error(await r.text())
+  return r.json()
+}
+async function simulate(){
+  try{
+    $('whatResult').textContent=JSON.stringify(await post('/api/simulate/what-if',{
+      aircraft_id:$('whatAircraft').value,component:'ENGINE',degradation_pct:+$('degradation').value
+    }),null,2)
+  }catch(e){$('whatResult').textContent=e.message}
+}
+async function recommend(){
+  try{
+    $('maintResult').textContent=JSON.stringify(await post('/api/maintenance/recommend',{
+      aircraft_id:$('maintAircraft').value,mission_priority:1
+    }),null,2)
+  }catch(e){$('maintResult').textContent=e.message}
+}
+function connect(){
+  const base=API_BASE?new URL(API_BASE):location
+  const protocol=base.protocol==='https:'?'wss':'ws'
+  const socket=new WebSocket(protocol+'://'+base.host+base.pathname.replace(/\/$/,'')+'/ws/telemetry')
+  socket.onmessage=e=>{
+    const data=JSON.parse(e.data)
+    $('stream').textContent=JSON.stringify(data,null,2)
+    loadFleet().catch(console.error)
+  }
+  socket.onclose=()=>setTimeout(connect,1500)
+  socket.onerror=()=>socket.close()
+}
+$('aircraftSelect').addEventListener('change',loadDetail)
+loadFleet().catch(e=>{$('stream').textContent=e.message})
+connect()
+setInterval(()=>loadFleet().catch(console.error),5000)
+</script>
+</body>
+</html>
