@@ -9,3 +9,6 @@ models/*
 !models/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
+
+# Local digital-twin persistence
+data/digital_twin_state.json
