@@ -78,6 +78,7 @@ class HealthState:
             "confidence": self.confidence,
             "data_quality": self.data_quality,
             "health_level": self.health_level.value,
+            "operational_state": self.health_level.value,
             "alert_level": self.alert_level,
             "reason_codes": list(self.reason_codes),
         }
