@@ -1,8 +1,18 @@
+import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
+import backend.app.main as main_module
+from backend.app.services.core import FleetService
+from digital_twin.state import DigitalTwinStore
 
-client = TestClient(app)
+client = TestClient(main_module.app)
+
+
+@pytest.fixture(autouse=True)
+def isolated_service(tmp_path):
+    main_module.service = FleetService(
+        twin_store=DigitalTwinStore(tmp_path / "digital_twin_state.json")
+    )
 
 
 def test_decision_api_surface():
