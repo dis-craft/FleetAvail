@@ -53,6 +53,7 @@ Fleet: verify 12 aircraft, readiness, current availability, projected availabili
 What-if: select an aircraft, set degradation to 20%, click Simulate. Health/RUL and projected fleet availability should decrease.
 
 Maintenance: select an aircraft and click Recommend. The response returns the priority component, action, schedule day, RUL, risk, spare and reason codes.
+Maintenance execution: POST /api/fleet/aircraft/AF-004/maintenance with a component, action and cycle; then GET the twin endpoint to see the MAINTENANCE event.
 
 Decision APIs:
 - GET /api/fleet/availability — current and projected fleet readiness
