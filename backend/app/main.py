@@ -42,6 +42,12 @@ class Maintenance(BaseModel):
     mission_priority: float = Field(1, ge=0.1, le=2)
 
 
+class MaintenanceExecution(BaseModel):
+    component: str = "ENGINE"
+    action: str = "REPLACE_COMPONENT"
+    cycle: int = Field(..., ge=0)
+
+
 class PlanningOptions(BaseModel):
     mission_priority: float = Field(1, ge=0.1, le=2)
     horizon_days: int = Field(7, ge=1, le=30)
@@ -81,6 +87,16 @@ def detail(aircraft_id: str):
 @app.get("/api/fleet/aircraft/{aircraft_id}/twin")
 def twin(aircraft_id: str):
     return service.twin_snapshot(aircraft_id)
+
+@app.post("/api/fleet/aircraft/{aircraft_id}/maintenance")
+def execute_maintenance(aircraft_id: str, x: MaintenanceExecution):
+    return service.record_maintenance(
+        aircraft_id,
+        x.component,
+        x.action,
+        x.cycle,
+    )
+
 
 
 @app.post("/api/predict")
