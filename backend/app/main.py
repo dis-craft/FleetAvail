@@ -2,7 +2,7 @@ from pathlib import Path
 import asyncio
 import json
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -14,8 +14,8 @@ service = FleetService()
 
 app = FastAPI(
     title="FleetAvail",
-    version="0.1.0",
-    description="SIH26249 aircraft predictive maintenance and fleet availability prototype",
+    version="0.2.0",
+    description="Aircraft predictive maintenance and fleet availability decision API",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +25,7 @@ app.add_middleware(
 )
 
 
-class Prediction(BaseModel):
+class PredictionRequest(BaseModel):
     aircraft_id: str
     component: str = "ENGINE"
     telemetry: dict[str, float] = Field(default_factory=dict)
@@ -39,7 +39,7 @@ class WhatIf(BaseModel):
 
 class Maintenance(BaseModel):
     aircraft_id: str
-    mission_priority: float = Field(1, ge=0.1, le=2)
+    mission_priority: float = Field(1, ge=.1, le=2)
 
 
 class MaintenanceExecution(BaseModel):
@@ -49,7 +49,7 @@ class MaintenanceExecution(BaseModel):
 
 
 class PlanningOptions(BaseModel):
-    mission_priority: float = Field(1, ge=0.1, le=2)
+    mission_priority: float = Field(1, ge=.1, le=2)
     horizon_days: int = Field(7, ge=1, le=30)
     max_daily_hours: float = Field(24, gt=0, le=168)
 
@@ -62,6 +62,11 @@ def root():
 @app.get("/health")
 def health():
     return service.health()
+
+
+@app.get("/api/models")
+def models():
+    return service.runtime.model_status
 
 
 @app.get("/api/fleet/summary")
@@ -81,37 +86,66 @@ def aircraft():
 
 @app.get("/api/fleet/aircraft/{aircraft_id}")
 def detail(aircraft_id: str):
-    return service.aircraft_detail(aircraft_id)
+    try:
+        return service.aircraft_detail(aircraft_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
 
 
 @app.get("/api/fleet/aircraft/{aircraft_id}/twin")
 def twin(aircraft_id: str):
-    return service.twin_snapshot(aircraft_id)
+    try:
+        return service.twin_snapshot(aircraft_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
+
 
 @app.post("/api/fleet/aircraft/{aircraft_id}/maintenance")
 def execute_maintenance(aircraft_id: str, x: MaintenanceExecution):
-    return service.record_maintenance(
-        aircraft_id,
-        x.component,
-        x.action,
-        x.cycle,
-    )
-
+    try:
+        return service.record_maintenance(
+            aircraft_id,
+            x.component.upper(),
+            x.action,
+            x.cycle,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/api/predict")
-def predict(x: Prediction):
-    return service.predict(x.aircraft_id, x.component, x.telemetry)
+def predict(x: PredictionRequest):
+    try:
+        return service.predict(x.aircraft_id, x.component.upper(), x.telemetry)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/api/simulate/what-if")
 def whatif(x: WhatIf):
-    return service.what_if(x.aircraft_id, x.component, x.degradation_pct)
+    try:
+        return service.what_if(
+            x.aircraft_id,
+            x.component.upper(),
+            x.degradation_pct,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
 
 
 @app.post("/api/maintenance/recommend")
 def recommend(x: Maintenance):
-    return service.maintenance_recommendation(x.aircraft_id, x.mission_priority)
+    try:
+        return service.maintenance_recommendation(
+            x.aircraft_id,
+            x.mission_priority,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
 
 
 @app.post("/api/maintenance/plan")
@@ -130,7 +164,11 @@ def spares():
 
 @app.post("/api/spares/allocate")
 def allocate_spares(x: PlanningOptions):
-    return service.allocate_spares_for_plan(x.mission_priority)
+    return service.allocate_spares_for_plan(
+        mission_priority=x.mission_priority,
+        horizon_days=x.horizon_days,
+        max_daily_hours=x.max_daily_hours,
+    )
 
 
 @app.post("/api/fleet/availability")
