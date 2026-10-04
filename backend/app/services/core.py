@@ -345,15 +345,21 @@ class FleetService:
             "inventory": summary,
         }
 
-    def fleet_availability(self, mission_priority: float = 1.0, horizon_days: int = 7):
+    def fleet_availability(
+        self,
+        mission_priority: float = 1.0,
+        horizon_days: int = 7,
+        max_daily_hours: float = 24.0,
+    ):
         plan = self.maintenance_plan(
             mission_priority=mission_priority,
             horizon_days=horizon_days,
+            max_daily_hours=max_daily_hours,
         )
         allocation = self.allocate_spares_for_plan(
             mission_priority=mission_priority,
             horizon_days=horizon_days,
-            max_daily_hours=24.0,
+            max_daily_hours=max_daily_hours,
         )
         allocated_keys = {
             (item["aircraft_id"], item["component"])
