@@ -65,6 +65,10 @@
       <span class="pill">Current architecture: backend-first</span>
       <span class="pill">Feature #2: sequence buffer implemented</span>
       <span class="pill">Feature #3: XGBoost failure risk implemented</span>
+      <span class="pill">Feature #4: Isolation Forest implemented</span>
+      <span class="pill">Feature #5: Health Fusion implemented</span>
+      <span class="pill">Feature #6: LSTM / TCN implemented</span>
+      <span class="pill">Features #8–11: decision layers implemented</span>
     </div>
   </main>
 </header>
@@ -114,8 +118,10 @@ Failure risk       RUL              Anomaly
       <div class="card"><span class="label">Provider boundary</span><strong class="done">Implemented</strong><p>A trained C-MAPSS RUL artifact can now sit behind a clean provider adapter without changing the decision-layer contract.</p></div>
       <div class="card"><span class="label">Sequence buffer</span><strong class="done">Implemented</strong><p>Feature #2 keeps the latest 30 telemetry samples separately for every aircraft/component pair.</p></div>
       <div class="card"><span class="label">XGBoost</span><strong class="done">Implemented</strong><p>Feature #3 now defines failure within a configurable RUL horizon, trains an XGBoost classifier, calibrates probabilities on held-out engines, and persists metadata.</p></div>
-      <div class="card"><span class="label">Next feature</span><strong class="next">Isolation Forest</strong><p>The next single feature is unsupervised anomaly detection; it will remain separate from the API integration.</p></div>
-      <div class="card"><span class="label">LSTM / TCN</span><strong class="target">Not yet</strong><p>Temporal deep-learning RUL models remain future work and must be compared with the current baseline.</p></div>
+      <div class="card"><span class="label">Isolation Forest</span><strong class="done">Implemented</strong><p>Normal-reference anomaly detector with calibrated threshold and persistence.</p></div>
+      <div class="card"><span class="label">Health Fusion</span><strong class="done">Implemented</strong><p>Typed NORMAL/WATCH/DEGRADED/CRITICAL state with reason codes and backward-compatible alert levels.</p></div>
+      <div class="card"><span class="label">LSTM / TCN</span><strong class="done">Implemented</strong><p>Temporal RUL training and inference branches with scaler persistence and baseline comparison metadata.</p></div>
+      <div class="card"><span class="label">Decision layers</span><strong class="done">8–11 Implemented</strong><p>Digital twin state, maintenance planning, spare allocation and fleet-availability projection are now available.</p></div>
       <div class="card"><span class="label">Frontend</span><strong class="target">Existing v1</strong><p>A runnable static dashboard exists under <code>frontend/index.html</code>; the final React/Next.js + Three.js UI comes later.</p></div>
     </div>
   </section>
@@ -164,7 +170,7 @@ Failure risk       RUL              Anomaly
         <div class="small">File: <code>docs/roadmap.md</code></div>
         <p><b>What it is:</b> A stage-by-stage implementation plan covering the complete FleetAvail system.</p>
         <p><b>Simple meaning:</b> It prevents us from implementing the frontend or optimizers before the model outputs and decision data are stable.</p>
-        <p><b>Relationship:</b> It defines the order: provider → sequence buffer → XGBoost → Isolation Forest → fusion → LSTM/TCN → real-time inference → digital twin → optimization → fleet availability → MLOps → final frontend.</p>
+        <p><b>Relationship:</b> It defines the order: provider → sequence buffer → XGBoost → Isolation Forest → Health Fusion → LSTM/TCN → real-time inference → digital twin → maintenance optimizer → spare allocation → fleet availability → MLOps → final frontend.</p>
       </div>
 
       <div class="entry">
@@ -192,6 +198,53 @@ Failure risk       RUL              Anomaly
       </div>
 
       <div class="entry">
+        <div class="title">Feature 5 — Formal Health Fusion</div>
+        <div class="small">File: <code>ml/health.py</code></div>
+        <p><b>What it is:</b> A typed state machine for converting model signals into an operational component state.</p>
+        <p><b>Simple meaning:</b> The system no longer has only a numeric health score. It also says whether the component is NORMAL, WATCH, DEGRADED or CRITICAL and explains why.</p>
+        <p><b>What it does:</b> Validates inputs, preserves the existing score weighting, classifies the operational state and adds explicit reason codes for risk, RUL, anomaly, health, data quality and confidence.</p>
+        <p><b>Relationship:</b> It is the decision boundary between independent ML branches and downstream maintenance/twin logic.</p>
+        <p><b>Tests:</b> <code>tests/test_health_fusion.py</code>.</p>
+      </div>
+
+      <div class="entry">
+        <div class="title">Feature 8 — Persistent Digital Twin lifecycle state</div>
+        <div class="small">File: <code>digital_twin/state.py</code></div>
+        <p><b>What it is:</b> Persistent aircraft/component state plus lifecycle events.</p>
+        <p><b>Simple meaning:</b> The system remembers what it knows about an aircraft instead of losing the state after every prediction.</p>
+        <p><b>Persistence:</b> The prototype uses an atomic local JSON file by default. The store API is backend-neutral so PostgreSQL/Redis can replace it later.</p>
+        <p><b>Events:</b> Prediction updates and maintenance actions are retained with timestamps and cycles.</p>
+        <p><b>Tests:</b> <code>tests/test_decision_layers.py</code>.</p>
+      </div>
+
+      <div class="entry">
+        <div class="title">Feature 9 — Constraint-aware maintenance optimizer</div>
+        <div class="small">File: <code>decision_engine/maintenance_optimizer.py</code></div>
+        <p><b>What it is:</b> A deterministic maintenance planning layer.</p>
+        <p><b>Simple meaning:</b> It ranks work by risk and RUL urgency, then puts work into a finite maintenance schedule.</p>
+        <p><b>Constraints:</b> Planning horizon, daily maintenance-hour capacity and spare availability are represented explicitly.</p>
+        <p><b>Outputs:</b> Action, priority score, scheduled day, duration, spare part and reason codes.</p>
+        <p><b>Tests:</b> <code>tests/test_decision_layers.py</code>.</p>
+      </div>
+
+      <div class="entry">
+        <div class="title">Feature 10 — Constrained spare allocation</div>
+        <div class="small">File: <code>decision_engine/spares.py</code></div>
+        <p><b>What it is:</b> Inventory allocation across competing maintenance requests.</p>
+        <p><b>Simple meaning:</b> A part cannot be given to everyone when only a limited number exists. Higher-priority compatible requests are served first and unmet demand is reported.</p>
+        <p><b>Tests:</b> <code>tests/test_decision_layers.py</code>.</p>
+      </div>
+
+      <div class="entry">
+        <div class="title">Feature 11 — Fleet availability projection</div>
+        <div class="small">File: <code>decision_engine/fleet_availability.py</code></div>
+        <p><b>What it is:</b> Current and projected fleet readiness calculation.</p>
+        <p><b>Simple meaning:</b> It estimates how many aircraft are available now and how many can recover within the planning horizon after feasible maintenance and spare decisions.</p>
+        <p><b>Outputs:</b> Current/projected availability percentages, blocked aircraft and recoverable aircraft.</p>
+        <p><b>Tests:</b> <code>tests/test_decision_layers.py</code>.</p>
+      </div>
+
+      <div class="entry">
         <div class="title">C-MAPSS raw-data directory structure</div>
         <div class="small">Files: <code>data/raw/cmapss/.gitkeep</code> and <code>data/raw/cmapss/FD001/.gitkeep</code></div>
         <p><b>What it is:</b> Repository placeholders for the required NASA C-MAPSS dataset location.</p>
@@ -216,7 +269,11 @@ Failure risk       RUL              Anomaly
         <tr><td><code>ml/sequence_buffer.py</code></td><td>Keeps the latest bounded telemetry history for one aircraft/component.</td><td>Future real-time inference → C-MAPSS/LSTM/TCN providers</td><td class="status done">Feature #2</td></tr>
         <tr><td><code>ml/cmapss/failure_risk.py</code></td><td>Predicts probability of failure within the configured RUL horizon.</td><td>Future Health Fusion / real-time inference</td><td class="status done">Feature #3</td></tr>
         <tr><td><code>ml/model_contract.py</code></td><td>Defines the common prediction shape.</td><td>All future model branches</td><td class="status done">Updated</td></tr>
-        <tr><td><code>ml/health.py</code></td><td>Converts health/risk/anomaly/RUL information into an operational health result.</td><td>Provider outputs → decisions</td><td class="status done">Existing prototype</td></tr>
+        <tr><td><code>ml/health.py</code></td><td>Converts health/risk/anomaly/RUL information into an operational health state.</td><td>Model branches → maintenance/twin</td><td class="status done">Feature #5</td></tr>
+        <tr><td><code>digital_twin/state.py</code></td><td>Persists aircraft/component state and lifecycle events.</td><td>Health → lifecycle decisions</td><td class="status done">Feature #8</td></tr>
+        <tr><td><code>decision_engine/maintenance_optimizer.py</code></td><td>Schedules risk-driven work under a daily capacity.</td><td>Twin/model state → maintenance</td><td class="status done">Feature #9</td></tr>
+        <tr><td><code>decision_engine/spares.py</code></td><td>Allocates limited compatible inventory.</td><td>Maintenance plan → parts</td><td class="status done">Feature #10</td></tr>
+        <tr><td><code>decision_engine/fleet_availability.py</code></td><td>Projects readiness after feasible decisions.</td><td>Maintenance + spares → fleet</td><td class="status done">Feature #11</td></tr>
         <tr><td><code>backend/app/main.py</code></td><td>FastAPI endpoints exposed to the dashboard.</td><td>Real-time inference</td><td class="status target">Still heuristic</td></tr>
         <tr><td><code>frontend/index.html</code></td><td>Current simple command dashboard.</td><td>FastAPI endpoints</td><td class="status done">Existing v1</td></tr>
       </tbody>
@@ -242,6 +299,11 @@ Failure risk       RUL              Anomaly
 
   <section>
     <h2>6. How to check each implemented feature</h2>
+    <h3>Features 5 and 8–11 — decision layers</h3>
+    <pre>pytest -q tests/test_health_fusion.py
+pytest -q tests/test_decision_layers.py
+pytest -q tests/test_api_decision_layers.py</pre>
+    <p>These checks cover typed health fusion, persistent twin state, maintenance scheduling, spare constraints, fleet availability, and the new FastAPI endpoints.</p>
     <h3>Feature 3 — Test the XGBoost failure-risk model</h3>
     <pre>pytest -q tests/test_failure.py</pre>
     <p>Expected: all four failure-risk tests pass.</p>
@@ -316,15 +378,14 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
       <tbody>
         <tr><td>Telemetry sequence buffer</td><td>In-memory rolling 30-cycle history per aircraft/component.</td><td class="status done">Implemented in Feature #2; API wiring comes later.</td></tr>
         <tr><td>XGBoost failure model</td><td>Near-term failure probability.</td><td class="status done">Implemented in Feature #3; training still requires the local NASA dataset.</td></tr>
-        <tr><td>Isolation Forest</td><td>Unsupervised anomaly score.</td><td>Next model branch after failure-risk.</td></tr>
-        <tr><td>Isolation Forest</td><td>Unsupervised anomaly score.</td><td>Needs a normal-operation reference and threshold calibration.</td></tr>
-        <tr><td>Formal HealthState fusion</td><td>NORMAL/WATCH/DEGRADED/CRITICAL operational state.</td><td>Should combine real model outputs once the branches exist.</td></tr>
-        <tr><td>LSTM/TCN RUL</td><td>True temporal RUL model and comparison against the baseline.</td><td>Requires training and validation; not replaced prematurely.</td></tr>
-        <tr><td>Real-time ML API integration</td><td>FastAPI receives sequence data and runs actual trained providers.</td><td>Depends on the sequence buffer and model artifacts.</td></tr>
-        <tr><td>Digital twin persistence</td><td>Aircraft/component lifecycle history, maintenance and degradation state.</td><td>Needs stable inference outputs.</td></tr>
-        <tr><td>Maintenance optimization</td><td>Constraint-aware maintenance scheduling.</td><td>Needs formal actions, durations and constraints.</td></tr>
-        <tr><td>Spare allocation</td><td>Fleet-wide allocation of limited compatible parts.</td><td>Needs fleet maintenance demand and prioritization.</td></tr>
-        <tr><td>Fleet availability optimization</td><td>Projected readiness after decisions.</td><td>Depends on maintenance + spare decisions.</td></tr>
+        <tr><td>Isolation Forest</td><td>Unsupervised anomaly score.</td><td class="status done">Implemented as Feature #4.</td></tr>
+        <tr><td>Formal HealthState fusion</td><td>NORMAL/WATCH/DEGRADED/CRITICAL operational state.</td><td class="status done">Implemented as Feature #5.</td></tr>
+        <tr><td>LSTM/TCN RUL</td><td>Temporal RUL models and comparison against the baseline.</td><td class="status done">Implemented as Feature #6; training remains local.</td></tr>
+        <tr><td>Real-time ML API integration</td><td>FastAPI receives sequence data and runs actual trained providers.</td><td>Next major integration stage.</td></tr>
+        <tr><td>Digital twin persistence</td><td>Aircraft/component lifecycle history and maintenance events.</td><td class="status done">Implemented as Feature #8 using local atomic JSON.</td></tr>
+        <tr><td>Maintenance optimization</td><td>Constraint-aware maintenance scheduling.</td><td class="status done">Implemented as Feature #9.</td></tr>
+        <tr><td>Spare allocation</td><td>Fleet-wide allocation of limited compatible parts.</td><td class="status done">Implemented as Feature #10.</td></tr>
+        <tr><td>Fleet availability optimization</td><td>Projected readiness after decisions.</td><td class="status done">Implemented as Feature #11.</td></tr>
         <tr><td>MLOps / explainability</td><td>Versioning, drift, uncertainty, SHAP and audit trail.</td><td>Best added once real models and decisions are stable.</td></tr>
         <tr><td>Final React/Next.js + Three.js frontend</td><td>Full operational dashboard and 3D digital twin.</td><td>Backend contracts should stabilize first.</td></tr>
       </tbody>
@@ -336,14 +397,14 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
     <pre>1. C-MAPSS provider boundary                    ✅
 2. 30-cycle telemetry sequence buffer           ✅
 3. XGBoost failure-risk model                    ✅
-4. Isolation Forest anomaly model                → NEXT
-5. Health Fusion formalization                   → NEXT
-6. LSTM/TCN comparison                           → NEXT
+4. Isolation Forest anomaly model                ✅
+5. Health Fusion formalization                   ✅
+6. LSTM/TCN comparison                           ✅
 7. Real-time ML provider integration             → NEXT
-8. Digital Twin persistence                      → NEXT
-9. Maintenance optimizer                         → NEXT
-10. Spare allocation                             → NEXT
-11. Fleet availability optimization              → NEXT
+8. Digital Twin persistence                      ✅
+9. Maintenance optimizer                         ✅
+10. Spare allocation                             ✅
+11. Fleet availability optimization              ✅
 12. MLOps / explanations / audit trail           → NEXT
 13. React/Next.js + Three.js final frontend      → FINAL</pre>
   </section>
@@ -374,7 +435,7 @@ python -m uvicorn backend.app.main:app --reload --port 8000</pre>
         <tr><td>Feature #3 changelog/roadmap updates</td><td>Current change</td><td><code>index.html</code>, <code>docs/roadmap.md</code></td></tr>
       </tbody>
     </table>
-    <p class="small">The commits above record the Feature #1, Feature #2 and Feature #3 implementation work. Feature #3 is implemented as a standalone model/training layer; it is not yet wired into the runtime API.</p>
+    <p class="small">The commits above record the staged implementation through Features #5 and #8–11. The remaining major integration gap is Stage 7: trained ML providers are not yet the runtime source for FastAPI predictions.</p>
   </section>
 
   <section>
